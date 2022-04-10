@@ -1,6 +1,6 @@
 {
-    "name": "kalnoy/nestedset",
-    "description": "Nested Set Model for Laravel 5.7 and up",
+    "name": "lychee-org/nestedset",
+    "description": "Nested Set Model for Laravel 5.7 and up (fork with patches for Lychee)",
     "keywords": ["laravel", "nested sets", "nsm", "database", "hierarchy"],
     "license": "MIT",
 
@@ -25,9 +25,19 @@
     },
 
     "require-dev": {
-        "phpunit/phpunit": "7.*|8.*|9.*"
+        "php-parallel-lint/php-parallel-lint": "^1.2",
+        "phpunit/phpunit": "^9.5.20"
     },
 
+    "scripts": {
+        "run-tests": [
+            "vendor/bin/phpunit -c phpunit.xml",
+            "vendor/bin/phpunit -c phpunit.xml --coverage-clover=coverage.xml"
+        ],
+        "validate-files": [
+            "vendor/bin/parallel-lint --exclude vendor ."
+        ]
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
 
@@ -41,10 +51,5 @@
                 "Kalnoy\\Nestedset\\NestedSetServiceProvider"
             ]
         }
-    },
-    "scripts": {
-        "test": [
-            "@php ./vendor/bin/phpunit"
-        ]
     }
 }
