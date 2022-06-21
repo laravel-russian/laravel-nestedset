@@ -7,78 +7,74 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Query\Builder;
-use InvalidArgumentException;
 
+/**
+ * @template TNodeModel of \Illuminate\Database\Eloquent\Model&\Kalnoy\Nestedset\Node
+ * @phpstan-extends Relation<TNodeModel>
+ */
 abstract class BaseRelation extends Relation
 {
     /**
-     * @var QueryBuilder
+     * @var QueryBuilder<TNodeModel>
      */
     protected $query;
 
     /**
-     * @var NodeTrait|Model
+     * @var TNodeModel
      */
     protected $parent;
 
-    /**
-     * The count of self joins.
-     *
-     * @var int
-     */
-    protected static $selfJoinCount = 0;
+	/**
+	 * @var TNodeModel
+	 */
+	protected $related;
 
     /**
      * AncestorsRelation constructor.
      *
-     * @param QueryBuilder $builder
-     * @param Model $model
+     * @param QueryBuilder<TNodeModel> $builder
+     * @param TNodeModel $model
      */
     public function __construct(QueryBuilder $builder, Model $model)
     {
-        if ( ! NestedSet::isNode($model)) {
-            throw new InvalidArgumentException('Model must be node.');
-        }
-
         parent::__construct($builder, $model);
     }
 
     /**
-     * @param Model $model
-     * @param $related
+     * @param TNodeModel $model
+     * @param TNodeModel $related
      *
      * @return bool
      */
-    abstract protected function matches(Model $model, $related);
+    abstract protected function matches(Model $model, Model $related): bool;
 
     /**
-     * @param QueryBuilder $query
-     * @param Model $model
+     * @param QueryBuilder<TNodeModel> $query
+     * @param TNodeModel $model
      *
      * @return void
      */
-    abstract protected function addEagerConstraint($query, $model);
+    abstract protected function addEagerConstraint(QueryBuilder $query, Model $model): void;
 
     /**
-     * @param $hash
-     * @param $table
-     * @param $lft
-     * @param $rgt
+     * @param string $hash
+     * @param string $table
+     * @param string $lft
+     * @param string $rgt
      *
      * @return string
      */
-    abstract protected function relationExistenceCondition($hash, $table, $lft, $rgt);
+    abstract protected function relationExistenceCondition(string $hash, string $table, string $lft, string $rgt): string;
 
     /**
-     * @param EloquentBuilder $query
-     * @param EloquentBuilder $parent
-     * @param array $columns
+     * @param EloquentBuilder<TNodeModel> $query
+     * @param EloquentBuilder<TNodeModel> $parentQuery
+     * @param array<string> $columns
      *
-     * @return mixed
+     * @return QueryBuilder<TNodeModel>
      */
-    public function getRelationExistenceQuery(EloquentBuilder $query, EloquentBuilder $parent,
-                                              $columns = [ '*' ]
-    ) {
+    public function getRelationExistenceQuery(EloquentBuilder $query, EloquentBuilder $parentQuery, $columns = ['*']): QueryBuilder
+    {
         $query = $this->getParent()->replicate()->newScopedQuery()->select($columns);
 
         $table = $query->getModel()->getTable();
@@ -101,12 +97,12 @@ abstract class BaseRelation extends Relation
     /**
      * Initialize the relation on a set of models.
      *
-     * @param  array $models
+     * @param  array<TNodeModel> $models
      * @param  string $relation
      *
-     * @return array
+     * @return array<TNodeModel>
      */
-    public function initRelation(array $models, $relation)
+    public function initRelation(array $models, $relation): array
     {
         return $models;
     }
@@ -117,7 +113,7 @@ abstract class BaseRelation extends Relation
      * @param  bool $incrementJoinCount
      * @return string
      */
-    public function getRelationCountHash($incrementJoinCount = true)
+    public function getRelationCountHash($incrementJoinCount = true): string
     {
         return 'nested_set_'.($incrementJoinCount ? static::$selfJoinCount++ : static::$selfJoinCount);
     }
@@ -125,9 +121,9 @@ abstract class BaseRelation extends Relation
     /**
      * Get the results of the relationship.
      *
-     * @return mixed
+     * @return Collection<TNodeModel>
      */
-    public function getResults()
+    public function getResults(): Collection
     {
         return $this->query->get();
     }
@@ -135,16 +131,13 @@ abstract class BaseRelation extends Relation
     /**
      * Set the constraints for an eager load of the relation.
      *
-     * @param  array $models
+     * @param  array<TNodeModel> $models
      *
      * @return void
      */
-    public function addEagerConstraints(array $models)
+    public function addEagerConstraints(array $models): void
     {
-        // The first model in the array is always the parent, so add the scope constraints based on that model.
-        // @link https://github.com/laravel/framework/pull/25240
-        // @link https://github.com/lazychaser/laravel-nestedset/issues/351
-        optional(reset($models))->applyNestedSetScope($this->query);
+        $this->parent->applyNestedSetScope($this->query);
 
         $this->query->whereNested(function (Builder $inner) use ($models) {
             // We will use this query in order to apply constraints to the
@@ -160,13 +153,13 @@ abstract class BaseRelation extends Relation
     /**
      * Match the eagerly loaded results to their parents.
      *
-     * @param  array $models
-     * @param  EloquentCollection $results
+     * @param  array<TNodeModel> $models
+     * @param  EloquentCollection<TNodeModel> $results
      * @param  string $relation
      *
-     * @return array
+     * @return array<TNodeModel>
      */
-    public function match(array $models, EloquentCollection $results, $relation)
+    public function match(array $models, EloquentCollection $results, $relation): array
     {
         foreach ($models as $model) {
             $related = $this->matchForModel($model, $results);
@@ -178,12 +171,12 @@ abstract class BaseRelation extends Relation
     }
 
     /**
-     * @param Model $model
-     * @param EloquentCollection $results
+     * @param TNodeModel $model
+     * @param EloquentCollection<TNodeModel> $results
      *
-     * @return Collection
+     * @return Collection<TNodeModel>
      */
-    protected function matchForModel(Model $model, EloquentCollection $results)
+    protected function matchForModel(Model $model, EloquentCollection $results): Collection
     {
         $result = $this->related->newCollection();
 
@@ -199,9 +192,9 @@ abstract class BaseRelation extends Relation
     /**
      * Get the plain foreign key.
      *
-     * @return mixed
+     * @return string
      */
-    public function getForeignKeyName()
+    public function getForeignKeyName(): string
     {
         // Return a stub value for relation
         // resolvers which need this function.
