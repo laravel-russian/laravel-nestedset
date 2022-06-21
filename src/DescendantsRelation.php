@@ -2,18 +2,20 @@
 
 namespace Kalnoy\Nestedset;
 
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @template TNodeModel of \Illuminate\Database\Eloquent\Model&\Kalnoy\Nestedset\Node
+ * @phpstan-extends BaseRelation<TNodeModel>
+ */
 class DescendantsRelation extends BaseRelation
 {
-
     /**
      * Set the base constraints on the relation query.
      *
      * @return void
      */
-    public function addConstraints()
+    public function addConstraints(): void
     {
         if ( ! static::$constraints) return;
 
@@ -22,35 +24,35 @@ class DescendantsRelation extends BaseRelation
     }
 
     /**
-     * @param QueryBuilder $query
-     * @param Model $model
+     * @param QueryBuilder<TNodeModel> $query
+     * @param TNodeModel $model
      */
-    protected function addEagerConstraint($query, $model)
+    protected function addEagerConstraint(QueryBuilder $query, Model $model): void
     {
         $query->orWhereDescendantOf($model);
     }
 
     /**
-     * @param Model $model
-     * @param $related
+     * @param TNodeModel $model
+     * @param TNodeModel $related
      *
-     * @return mixed
+     * @return bool
      */
-    protected function matches(Model $model, $related)
+    protected function matches(Model $model, Model $related): bool
     {
         return $related->isDescendantOf($model);
     }
 
     /**
-     * @param $hash
-     * @param $table
-     * @param $lft
-     * @param $rgt
+     * @param string $hash
+     * @param string $table
+     * @param string $lft
+     * @param string $rgt
      *
      * @return string
      */
-    protected function relationExistenceCondition($hash, $table, $lft, $rgt)
+    protected function relationExistenceCondition(string $hash, string $table, string $lft, string $rgt): string
     {
-        return "{$hash}.{$lft} between {$table}.{$lft} + 1 and {$table}.{$rgt}";
+        return "$hash.$lft between $table.$lft + 1 and $table.$rgt";
     }
 }
