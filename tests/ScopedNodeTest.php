@@ -1,9 +1,22 @@
 <?php
 
-use Illuminate\Database\Capsule\Manager as Capsule;
-use Kalnoy\Nestedset\NestedSet;
+/**
+ * @noinspection PhpPossiblePolymorphicInvocationInspection PHPStorm is unaware that Category::query returns a
+ *                                                          Nested Set query and tries to resolve the method to
+ *                                                          the normal query builder
+ * @noinspection PhpUnhandledExceptionInspection            Tests are supposed to throw exceptions
+ */
 
-class ScopedNodeTest extends PHPUnit\Framework\TestCase
+namespace Tests;
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Schema\Blueprint;
+use Kalnoy\Nestedset\NestedSet;
+use PHPUnit\Framework\TestCase;
+use Tests\Models\MenuItem;
+
+class ScopedNodeTest extends TestCase
 {
     public static function setUpBeforeClass(): void
     {
@@ -13,7 +26,7 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
         Capsule::disableQueryLog();
 
-        $schema->create('menu_items', function (\Illuminate\Database\Schema\Blueprint $table) {
+        $schema->create('menu_items', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('menu_id');
             $table->string('title')->nullable();
@@ -25,7 +38,7 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
-        $data = include __DIR__.'/data/menu_items.php';
+        $data = include __DIR__ . '/Data/menu_items.php';
 
         Capsule::table('menu_items')->insert($data);
 
@@ -54,11 +67,11 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testMovingNodeNotAffectingOtherMenu()
     {
-        $node = MenuItem::where('menu_id', '=', 1)->first();
+        $node = MenuItem::query()->where('menu_id', '=', 1)->first();
 
         $node->down();
 
-        $node = MenuItem::where('menu_id', '=', 2)->first();
+        $node = MenuItem::query()->where('menu_id', '=', 2)->first();
 
         $this->assertEquals(1, $node->getLft());
     }
@@ -72,7 +85,8 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testSiblings()
     {
-        $node = MenuItem::find(1);
+		/** @var MenuItem $node */
+        $node = MenuItem::query()->find(1);
 
         $result = $node->getSiblings();
 
@@ -83,7 +97,8 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
         $this->assertEquals(2, $result->first()->getKey());
 
-        $node = MenuItem::find(2);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(2);
 
         $result = $node->getPrevSiblings();
 
@@ -92,13 +107,15 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testDescendants()
     {
-        $node = MenuItem::find(2);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(2);
 
         $result = $node->getDescendants();
 
         $this->assertEquals(1, $result->count());
         $this->assertEquals(5, $result->first()->getKey());
 
+	    /** @var MenuItem $node */
         $node = MenuItem::scoped([ 'menu_id' => 1 ])->with('descendants')->find(2);
 
         $result = $node->descendants;
@@ -109,13 +126,15 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testAncestors()
     {
-        $node = MenuItem::find(5);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(5);
 
         $result = $node->getAncestors();
 
         $this->assertEquals(1, $result->count());
         $this->assertEquals(2, $result->first()->getKey());
 
+	    /** @var MenuItem $node */
         $node = MenuItem::scoped([ 'menu_id' => 1 ])->with('ancestors')->find(5);
 
         $result = $node->ancestors;
@@ -126,11 +145,13 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testDepth()
     {
-        $node = MenuItem::scoped([ 'menu_id' => 1 ])->withDepth()->where('id', '=', 5)->first();
+	    /** @var MenuItem $node */
+		$node = MenuItem::scoped([ 'menu_id' => 1 ])->withDepth()->where('id', '=', 5)->first();
 
         $this->assertEquals(1, $node->depth);
 
-        $node = MenuItem::find(2);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(2);
 
         $result = $node->children()->withDepth()->get();
 
@@ -139,7 +160,8 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testSaveAsRoot()
     {
-        $node = MenuItem::find(5);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(5);
 
         $node->saveAsRoot();
 
@@ -161,16 +183,17 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testInsertionToParentFromOtherScope()
     {
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        $this->expectException(ModelNotFoundException::class);
 
-        $node = MenuItem::create([ 'menu_id' => 2, 'parent_id' => 5 ]);
+        MenuItem::create([ 'menu_id' => 2, 'parent_id' => 5 ]);
     }
 
     public function testDeletion()
     {
-        $node = MenuItem::find(2)->delete();
+        MenuItem::query()->find(2)->delete();
 
-        $node = MenuItem::find(1);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(1);
 
         $this->assertEquals(2, $node->getRgt());
 
@@ -179,7 +202,8 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testMoving()
     {
-        $node = MenuItem::find(1);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(1);
         $this->assertTrue($node->down());
 
         $this->assertOtherScopeNotAffected();
@@ -187,7 +211,8 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     protected function assertOtherScopeNotAffected()
     {
-        $node = MenuItem::find(3);
+	    /** @var MenuItem $node */
+        $node = MenuItem::query()->find(3);
 
         $this->assertEquals(1, $node->getLft());
     }
@@ -202,20 +227,24 @@ class ScopedNodeTest extends PHPUnit\Framework\TestCase
 
     public function testAppendingToAnotherScopeFails()
     {
-        $this->expectException(LogicException::class);
+        $this->expectException(\LogicException::class);
 
-        $a = MenuItem::find(1);
-        $b = MenuItem::find(3);
+	    /** @var MenuItem $a */
+        $a = MenuItem::query()->find(1);
+	    /** @var MenuItem $b */
+        $b = MenuItem::query()->find(3);
 
         $a->appendToNode($b)->save();
     }
 
     public function testInsertingBeforeAnotherScopeFails()
     {
-        $this->expectException(LogicException::class);
+        $this->expectException(\LogicException::class);
 
-        $a = MenuItem::find(1);
-        $b = MenuItem::find(3);
+	    /** @var MenuItem $a */
+        $a = MenuItem::query()->find(1);
+	    /** @var MenuItem $b */
+        $b = MenuItem::query()->find(3);
 
         $a->insertAfterNode($b);
     }
