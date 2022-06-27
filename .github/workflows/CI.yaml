@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         operating-system: [ubuntu-20.04]
-        php-versions: ['7.4', '8.0', '8.1']
+        php-versions: ['8.0', '8.1']
         dependencies: ['no', 'low', 'beta']
         exclude:
           - operating-system: ubuntu-20.04
@@ -70,7 +70,7 @@ jobs:
           extensions: ${{ env.extensions }}
           coverage: xdebug
           tools: pecl, composer
-      
+
       - name: PHP Show modules
         run: php -m
 
@@ -95,6 +95,6 @@ jobs:
 
       - name: Validate files
         run: composer validate-files
-      
+
       - name: Run tests
         run: composer run-tests
