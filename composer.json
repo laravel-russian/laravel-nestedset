@@ -57,12 +57,5 @@
         ]
     },
     "minimum-stability": "dev",
-    "prefer-stable": true,
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Kalnoy\\Nestedset\\NestedSetServiceProvider"
-            ]
-        }
-    }
+    "prefer-stable": true
 }
