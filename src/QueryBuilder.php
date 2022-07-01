@@ -28,24 +28,24 @@ class QueryBuilder extends EloquentBuilder
      */
     protected $model;
 
-	/**
-	 * Execute the query as a "select" statement.
-	 *
-	 * @param  array<string>|string  $columns
-	 * @phpstan-param array<model-property<TNodeModel>|'*'>|model-property<TNodeModel>|'*' $columns
-	 * @return Collection<TNodeModel>
-	 */
-	public function get($columns = ['*']): Collection
-	{
-		/**
-		 * The parent method returns the Laravel standard collection,
-		 * but we know that it is an instance of our special collection.
-		 *
-		 * @noinspection PhpIncompatibleReturnTypeInspection
-		 * @phpstan-ignore-next-line
-		 */
-		return parent::get($columns);
-	}
+    /**
+     * Execute the query as a "select" statement.
+     *
+     * @param  array<string>|string  $columns
+     * @phpstan-param array<model-property<TNodeModel>|'*'>|model-property<TNodeModel>|'*' $columns
+     * @return Collection<TNodeModel>
+     */
+    public function get($columns = ['*']): Collection
+    {
+        /**
+         * The parent method returns the Laravel standard collection,
+         * but we know that it is an instance of our special collection.
+         *
+         * @noinspection PhpIncompatibleReturnTypeInspection
+         * @phpstan-ignore-next-line
+         */
+        return parent::get($columns);
+    }
 
     /**
      * Get node's `lft` and `rgt` values.
@@ -63,21 +63,26 @@ class QueryBuilder extends EloquentBuilder
 
         $query->where($this->model->getKeyName(), '=', $id);
 
-        $data = $query->first([ $this->model->getLftName(),
-                                $this->model->getRgtName() ]);
+        // fixed bug when move a node to the new position
+        // $data = $query->first([ $this->model->getLftName(),
+        //                         $this->model->getRgtName() ]);
+        $data = $query->select([
+            $this->model->getLftName(),
+            $this->model->getRgtName(),
+        ])->first();
 
         if ($data === null && $required) {
-			$e = new ModelNotFoundException();
-			$e->setModel($this->model, [$id]);
+            $e = new ModelNotFoundException();
+            $e->setModel($this->model, [$id]);
             throw $e;
         }
 
-	    /**
-	     * This method must return an array with exactly to integers.
-	     * We do so indeed as the query has been accordingly constructed so
-	     * above, but PHPStan doesn't know that.
-	     * @phpstan-ignore-next-line
-	     */
+        /**
+         * This method must return an array with exactly to integers.
+         * We do so indeed as the query has been accordingly constructed so
+         * above, but PHPStan doesn't know that.
+         * @phpstan-ignore-next-line
+         */
         return (array)$data;
     }
 
@@ -134,16 +139,16 @@ class QueryBuilder extends EloquentBuilder
             $valueQuery = $this->model
                 ->newQuery()
                 ->toBase()
-                ->select("_.".$this->model->getRgtName())
-                ->from($this->model->getTable().' as _')
+                ->select("_." . $this->model->getRgtName())
+                ->from($this->model->getTable() . ' as _')
                 ->where($this->model->getKeyName(), '=', $nodeOrId)
                 ->limit(1);
 
             $this->query->mergeBindings($valueQuery);
 
-            $value = '('.$valueQuery->toSql().')';
+            $value = '(' . $valueQuery->toSql() . ')';
 
-			$id = $nodeOrId;
+            $id = $nodeOrId;
         }
 
         $this->query->whereNested(function ($inner) use ($value, $andSelf, $id, $keyName) {
@@ -152,7 +157,7 @@ class QueryBuilder extends EloquentBuilder
 
             $inner->whereRaw("$value between $wrappedTable.$lft and $wrappedTable.$rgt");
 
-            if ( ! $andSelf) {
+            if (!$andSelf) {
                 $inner->where($keyName, '<>', $id);
             }
         }, $boolean);
@@ -254,18 +259,21 @@ class QueryBuilder extends EloquentBuilder
      *
      * @return $this
      */
-    public function whereDescendantOf(Node|int|string $modelOrId, string $boolean = 'and', bool $not = false,
-                                      bool $andSelf = false
+    public function whereDescendantOf(
+        Node|int|string $modelOrId,
+        string $boolean = 'and',
+        bool $not = false,
+        bool $andSelf = false
     ): static {
         if ($modelOrId instanceof Node) {
             $data = $modelOrId->getBounds();
         } else {
             $data = $this->model->newNestedSetQuery()
-                                ->getPlainNodeData($modelOrId, true);
+                ->getPlainNodeData($modelOrId, true);
         }
 
         // Don't include the node
-        if ( ! $andSelf) {
+        if (!$andSelf) {
             ++$data[0];
         }
 
@@ -360,18 +368,18 @@ class QueryBuilder extends EloquentBuilder
             $valueQuery = $this->model
                 ->newQuery()
                 ->toBase()
-                ->select('_n.'.$this->model->getLftName())
-                ->from($this->model->getTable().' as _n')
-                ->where('_n.'.$this->model->getKeyName(), '=', $nodeOrId);
+                ->select('_n.' . $this->model->getLftName())
+                ->from($this->model->getTable() . ' as _n')
+                ->where('_n.' . $this->model->getKeyName(), '=', $nodeOrId);
 
             $this->query->mergeBindings($valueQuery);
 
-            $value = '('.$valueQuery->toSql().')';
+            $value = '(' . $valueQuery->toSql() . ')';
         }
 
         list($lft,) = $this->wrappedColumns();
 
-        $this->query->whereRaw("{$lft} {$operator} {$value}", [ ], $boolean);
+        $this->query->whereRaw("{$lft} {$operator} {$value}", [], $boolean);
 
         return $this;
     }
@@ -414,7 +422,7 @@ class QueryBuilder extends EloquentBuilder
         list($lft, $rgt) = $this->wrappedColumns();
         $this->query->whereRaw("$lft = $rgt - 1");
 
-		return $this;
+        return $this;
     }
 
     /**
@@ -450,7 +458,7 @@ class QueryBuilder extends EloquentBuilder
             ->newScopedQuery('_d')
             ->toBase()
             ->selectRaw('count(1) - 1')
-            ->from($this->model->getTable().' as '.$alias)
+            ->from($this->model->getTable() . ' as ' . $alias)
             ->whereRaw("$table.$lft between $wrappedAlias.$lft and $wrappedAlias.$rgt");
 
         $this->query->selectSub($query, $as);
@@ -580,7 +588,7 @@ class QueryBuilder extends EloquentBuilder
     public function moveNode(int|string $id, int $position): int
     {
         list($lft, $rgt) = $this->model->newNestedSetQuery()
-                                       ->getPlainNodeData($id, true);
+            ->getPlainNodeData($id, true);
 
         if ($lft < $position && $position <= $rgt) {
             throw new LogicException('Cannot move node into itself.');
@@ -609,7 +617,7 @@ class QueryBuilder extends EloquentBuilder
 
         $params = compact('lft', 'rgt', 'from', 'to', 'height', 'distance');
 
-        $boundary = [ $from, $to ];
+        $boundary = [$from, $to];
 
         $query = $this->toBase()->where(function (BaseQueryBuilder $inner) use ($boundary) {
             $inner->whereBetween($this->model->getLftName(), $boundary);
@@ -656,7 +664,7 @@ class QueryBuilder extends EloquentBuilder
 
         $columns = [];
 
-        foreach ([ $this->model->getLftName(), $this->model->getRgtName() ] as $col) {
+        foreach ([$this->model->getLftName(), $this->model->getRgtName()] as $col) {
             $columns[$col] = $this->columnPatch($grammar->wrap($col), $params);
         }
 
@@ -678,10 +686,10 @@ class QueryBuilder extends EloquentBuilder
         extract($params);
 
         /** @var int $height */
-        if ($height > 0) $height = '+'.$height;
+        if ($height > 0) $height = '+' . $height;
 
         if (isset($cut)) {
-	        /** @var int $cut */
+            /** @var int $cut */
             return new Expression("case when {$col} >= {$cut} then {$col}{$height} else {$col} end");
         }
 
@@ -690,12 +698,13 @@ class QueryBuilder extends EloquentBuilder
         /** @var int $rgt */
         /** @var int $from */
         /** @var int $to */
-        if ($distance > 0) $distance = '+'.$distance;
+        if ($distance > 0) $distance = '+' . $distance;
 
-        return new Expression("case ".
-                              "when $col between $lft and $rgt then $col$distance ". // Move the node
-                              "when $col between $from and $to then $col$height ". // Move other nodes
-                              "else $col end"
+        return new Expression(
+            "case " .
+                "when $col between $lft and $rgt then $col$distance " . // Move the node
+                "when $col between $from and $to then $col$height " . // Move other nodes
+                "else $col end"
         );
     }
 
@@ -708,7 +717,7 @@ class QueryBuilder extends EloquentBuilder
      */
     public function countErrors(): array
     {
-		/** @var array<string, BaseQueryBuilder> $checks */
+        /** @var array<string, BaseQueryBuilder> $checks */
         $checks = [];
 
         // Check if lft and rgt values are ok
@@ -721,7 +730,7 @@ class QueryBuilder extends EloquentBuilder
         $checks['wrong_parent'] = $this->getWrongParentQuery();
 
         // Check for nodes that have missing parent
-        $checks['missing_parent' ] = $this->getMissingParentQuery();
+        $checks['missing_parent'] = $this->getMissingParentQuery();
 
         $query = $this->query->newQuery();
 
@@ -731,13 +740,13 @@ class QueryBuilder extends EloquentBuilder
             $query->selectSub($inner, $key);
         }
 
-	    /**
-	     * This method must return an array with exactly to integers.
-	     * We do so indeed as the query has been accordingly constructed so
-	     * above, but PHPStan doesn't know that.
-	     * @phpstan-ignore-next-line
-	     */
-	    return (array)$query->first();
+        /**
+         * This method must return an array with exactly to integers.
+         * We do so indeed as the query has been accordingly constructed so
+         * above, but PHPStan doesn't know that.
+         * @phpstan-ignore-next-line
+         */
+        return (array)$query->first();
     }
 
     /**
@@ -752,7 +761,7 @@ class QueryBuilder extends EloquentBuilder
                 list($lft, $rgt) = $this->wrappedColumns();
 
                 $inner->whereRaw("$lft >= $rgt")
-                      ->orWhereRaw("($rgt - $lft) % 2 = 0");
+                    ->orWhereRaw("($rgt - $lft) % 2 = 0");
             });
     }
 
@@ -779,9 +788,9 @@ class QueryBuilder extends EloquentBuilder
                 list($lft, $rgt) = $this->wrappedColumns();
 
                 $inner->orWhereRaw("$waFirst.$lft}=$waSecond.$lft")
-                      ->orWhereRaw("$waFirst.$rgt=$waSecond.$rgt")
-                      ->orWhereRaw("$waFirst.$lft=$waSecond.$rgt")
-                      ->orWhereRaw("$waFirst.$rgt=$waSecond.$lft");
+                    ->orWhereRaw("$waFirst.$rgt=$waSecond.$rgt")
+                    ->orWhereRaw("$waFirst.$lft=$waSecond.$rgt")
+                    ->orWhereRaw("$waFirst.$rgt=$waSecond.$lft");
             });
 
         return $this->model->applyNestedSetScope($query, $secondAlias);
@@ -818,8 +827,8 @@ class QueryBuilder extends EloquentBuilder
                 list($lft, $rgt) = $this->wrappedColumns();
 
                 $inner->whereRaw("{$waChild}.{$lft} not between {$waParent}.{$lft} and {$waParent}.{$rgt}")
-                      ->orWhereRaw("{$waChild}.{$lft} between {$waInterm}.{$lft} and {$waInterm}.{$rgt}")
-                      ->whereRaw("{$waInterm}.{$lft} between {$waParent}.{$lft} and {$waParent}.{$rgt}");
+                    ->orWhereRaw("{$waChild}.{$lft} between {$waInterm}.{$lft} and {$waInterm}.{$rgt}")
+                    ->whereRaw("{$waInterm}.{$lft} between {$waParent}.{$lft} and {$waParent}.{$rgt}");
             });
 
         $this->model->applyNestedSetScope($query, $parentAlias);
@@ -856,7 +865,7 @@ class QueryBuilder extends EloquentBuilder
                 $this->model->applyNestedSetScope($existsCheck, $alias);
 
                 $inner->whereRaw("{$parentIdName} is not null")
-                      ->addWhereExistsQuery($existsCheck, 'and', true);
+                    ->addWhereExistsQuery($existsCheck, 'and', true);
             });
     }
 
@@ -902,15 +911,15 @@ class QueryBuilder extends EloquentBuilder
             $this->model->getRgtName(),
         ];
 
-		$query = $this->model->newNestedSetQuery();
-		if ($root !== null) {
-			$query->whereDescendantOf($root);
-		}
-	    $dictionary = $query
-		    ->defaultOrder()
-		    ->get($columns)
-		    ->groupBy($this->model->getParentIdName())
-		    ->all();
+        $query = $this->model->newNestedSetQuery();
+        if ($root !== null) {
+            $query->whereDescendantOf($root);
+        }
+        $dictionary = $query
+            ->defaultOrder()
+            ->get($columns)
+            ->groupBy($this->model->getParentIdName())
+            ->all();
 
         return $this->fixNodes($dictionary, $root);
     }
@@ -972,9 +981,12 @@ class QueryBuilder extends EloquentBuilder
      * @return int
      */
     protected static function reorderNodes(
-        array &$dictionary, array &$updated, int|string|null $parentId = null, int $cut = 1
+        array &$dictionary,
+        array &$updated,
+        int|string|null $parentId = null,
+        int $cut = 1
     ): int {
-        if ( ! isset($dictionary[$parentId])) {
+        if (!isset($dictionary[$parentId])) {
             return $cut;
         }
 
@@ -996,148 +1008,153 @@ class QueryBuilder extends EloquentBuilder
         return $cut;
     }
 
-	/**
-	 * Rebuild the tree based on raw data.
-	 *
-	 * If item data does not contain primary key, new node will be created.
-	 *
-	 * @param array<array<string, mixed>> $data
-	 * @param bool $delete Whether to delete nodes that exist but not in the data
-	 *                     array
-	 * @param TNodeModel|int|string|null $rootNodeOrId
-	 *
-	 * @return int
-	 *
-	 * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
-	 */
-	public function rebuildTree(
-		array $data, bool $delete = false, Node|int|string|null $rootNodeOrId = null
-	): int {
-		if ($this->model instanceof NodeWithSoftDelete) {
-			/**
-			 * The query instance has this method by some Laravel macro magic
-			 * which is just too magic for PHPStan.
-			 * @phpstan-ignore-next-line
-			 */
-			$this->withTrashed();
-		}
+    /**
+     * Rebuild the tree based on raw data.
+     *
+     * If item data does not contain primary key, new node will be created.
+     *
+     * @param array<array<string, mixed>> $data
+     * @param bool $delete Whether to delete nodes that exist but not in the data
+     *                     array
+     * @param TNodeModel|int|string|null $rootNodeOrId
+     *
+     * @return int
+     *
+     * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
+     */
+    public function rebuildTree(
+        array $data,
+        bool $delete = false,
+        Node|int|string|null $rootNodeOrId = null
+    ): int {
+        if ($this->model instanceof NodeWithSoftDelete) {
+            /**
+             * The query instance has this method by some Laravel macro magic
+             * which is just too magic for PHPStan.
+             * @phpstan-ignore-next-line
+             */
+            $this->withTrashed();
+        }
 
-		if ($rootNodeOrId !== null) {
-			$this->whereDescendantOf($rootNodeOrId);
-		}
-		/** @var array<int|string, TNodeModel> $existing */
-		$existing = $this->get()->getDictionary();
+        if ($rootNodeOrId !== null) {
+            $this->whereDescendantOf($rootNodeOrId);
+        }
+        /** @var array<int|string, TNodeModel> $existing */
+        $existing = $this->get()->getDictionary();
 
-		$dictionary = [];
-		/** @var int|string|null $parentId */
-		$parentId = $rootNodeOrId instanceof Node ? $rootNodeOrId->getKey() : $rootNodeOrId;
+        $dictionary = [];
+        /** @var int|string|null $parentId */
+        $parentId = $rootNodeOrId instanceof Node ? $rootNodeOrId->getKey() : $rootNodeOrId;
 
-		$this->buildRebuildDictionary($dictionary, $data, $existing, $parentId);
+        $this->buildRebuildDictionary($dictionary, $data, $existing, $parentId);
 
-		if (count($existing) !== 0) {
-			if ($delete && ! $this->model instanceof NodeWithSoftDelete) {
-				$this->model
-					->newScopedQuery()
-					->toBase()
-					->whereIn($this->model->getKeyName(), array_keys($existing))
-					->delete();
-			} else {
-				/**
-				 * @var Model&Node $model
-				 * @phpstan-var TNodeModel $model
-				 */
-				foreach ($existing as $model) {
-					$dictionary[$model->getParentId()][] = $model;
+        if (count($existing) !== 0) {
+            if ($delete && !$this->model instanceof NodeWithSoftDelete) {
+                $this->model
+                    ->newScopedQuery()
+                    ->toBase()
+                    ->whereIn($this->model->getKeyName(), array_keys($existing))
+                    ->delete();
+            } else {
+                /**
+                 * @var Model&Node $model
+                 * @phpstan-var TNodeModel $model
+                 */
+                foreach ($existing as $model) {
+                    $dictionary[$model->getParentId()][] = $model;
 
-					if (
-						$delete &&
-						$model instanceof NodeWithSoftDelete &&
-						$model->getAttribute($model->getDeletedAtColumn()) === null
-					) {
-						$time = $model->fromDateTime($model->freshTimestamp());
+                    if (
+                        $delete &&
+                        $model instanceof NodeWithSoftDelete &&
+                        $model->getAttribute($model->getDeletedAtColumn()) === null
+                    ) {
+                        $time = $model->fromDateTime($model->freshTimestamp());
 
-						$model->setAttribute($model->getDeletedAtColumn(), $time);
-					}
-				}
-			}
-		}
+                        $model->setAttribute($model->getDeletedAtColumn(), $time);
+                    }
+                }
+            }
+        }
 
-		// TODO: If this line is commented out and returns a fixed value, PHPstan can analyze the code, but with this function call PHPstan crashes with an out-of-memory error.
-		return $this->fixNodes($dictionary, $rootNodeOrId);
-	}
+        // TODO: If this line is commented out and returns a fixed value, PHPstan can analyze the code, but with this function call PHPstan crashes with an out-of-memory error.
+        return $this->fixNodes($dictionary, $rootNodeOrId);
+    }
 
-	/**
-	 * @param TNodeModel|int|string|null $rootNodeOrId
-	 * @param array<array<string, mixed>> $data
-	 * @param bool $delete
-	 *
-	 * @return int
-	 *
-	 * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
-	 */
-	public function rebuildSubtree(Node|int|string|null $rootNodeOrId, array $data, bool $delete = false): int
-	{
-		return $this->rebuildTree($data, $delete, $rootNodeOrId);
-	}
+    /**
+     * @param TNodeModel|int|string|null $rootNodeOrId
+     * @param array<array<string, mixed>> $data
+     * @param bool $delete
+     *
+     * @return int
+     *
+     * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
+     */
+    public function rebuildSubtree(Node|int|string|null $rootNodeOrId, array $data, bool $delete = false): int
+    {
+        return $this->rebuildTree($data, $delete, $rootNodeOrId);
+    }
 
-	/**
-	 * @param array<int|string|null, array<TNodeModel>> $dictionary
-	 * @param array<array<string, mixed>> $data
-	 * @param array<int|string, TNodeModel> $existing
-	 * @param int|string|null $parentId
-	 *
-	 * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
-	 */
-	protected function buildRebuildDictionary(array           &$dictionary,
-	                                          array           $data,
-	                                          array           &$existing,
-	                                          int|string|null $parentId = null
-	): void {
-		$keyName = $this->model->getKeyName();
+    /**
+     * @param array<int|string|null, array<TNodeModel>> $dictionary
+     * @param array<array<string, mixed>> $data
+     * @param array<int|string, TNodeModel> $existing
+     * @param int|string|null $parentId
+     *
+     * @phpstan-param array<array<model-property<TNodeModel>, mixed>> $data
+     */
+    protected function buildRebuildDictionary(
+        array           &$dictionary,
+        array           $data,
+        array           &$existing,
+        int|string|null $parentId = null
+    ): void {
+        $keyName = $this->model->getKeyName();
 
-		/**
-		 * @var array<string, mixed> $itemData
-		 * @phpstan-var array<model-property<TNodeModel>, mixed> $itemData
-		 */
-		foreach ($data as $itemData) {
-			if ( ! isset($itemData[$keyName])) {
-				/**
-				 * @var Model&Node $model
-				 * @phpstan-var TNodeModel $model
-				 */
-				$model = $this->model->newInstance($this->model->getAttributes());
+        /**
+         * @var array<string, mixed> $itemData
+         * @phpstan-var array<model-property<TNodeModel>, mixed> $itemData
+         */
+        foreach ($data as $itemData) {
+            if (!isset($itemData[$keyName])) {
+                /**
+                 * @var Model&Node $model
+                 * @phpstan-var TNodeModel $model
+                 */
+                $model = $this->model->newInstance($this->model->getAttributes());
 
-				// Set some values that will be fixed later
-				$model->rawNode(0, 0, $parentId);
-			} else {
-				if ( ! isset($existing[$key = $itemData[$keyName]])) {
-					throw new ModelNotFoundException();
-				}
+                // Set some values that will be fixed later
+                $model->rawNode(0, 0, $parentId);
+            } else {
+                if (!isset($existing[$key = $itemData[$keyName]])) {
+                    throw new ModelNotFoundException();
+                }
 
-				/**
-				 * @var Model&Node $model
-				 * @phpstan-var TNodeModel $model
-				 */
-				$model = $existing[$key];
+                /**
+                 * @var Model&Node $model
+                 * @phpstan-var TNodeModel $model
+                 */
+                $model = $existing[$key];
 
-				// Disable any tree actions
-				$model->rawNode($model->getLft(), $model->getRgt(), $parentId);
+                // Disable any tree actions
+                $model->rawNode($model->getLft(), $model->getRgt(), $parentId);
 
-				unset($existing[$key]);
-			}
+                unset($existing[$key]);
+            }
 
-			$model->fill(Arr::except($itemData, 'children'))->save();
+            $model->fill(Arr::except($itemData, 'children'))->save();
 
-			$dictionary[$parentId][] = $model;
+            $dictionary[$parentId][] = $model;
 
-			if ( ! isset($itemData['children'])) continue;
+            if (!isset($itemData['children'])) continue;
 
-			$this->buildRebuildDictionary($dictionary,
-				$itemData['children'],
-				$existing,
-				$model->getKey());
-		}
-	}
+            $this->buildRebuildDictionary(
+                $dictionary,
+                $itemData['children'],
+                $existing,
+                $model->getKey()
+            );
+        }
+    }
 
     /**
      * @param string|null $table
@@ -1148,7 +1165,7 @@ class QueryBuilder extends EloquentBuilder
     {
         $this->model->applyNestedSetScope($this, $table);
 
-		return $this;
+        return $this;
     }
 
     /**
